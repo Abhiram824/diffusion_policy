@@ -231,7 +231,7 @@ def _convert_actions(raw_actions, abs_action, rotation_transformer):
 
         pos = raw_actions[...,:3]
         rot = raw_actions[...,3:6]
-        gripper = raw_actions[...,6:]
+        gripper = raw_actions[...,6:7]
         rot = rotation_transformer.forward(rot)
         raw_actions = np.concatenate([
             pos, rot, gripper
