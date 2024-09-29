@@ -75,32 +75,32 @@ class RobomimicImageWrapper(gym.Env):
         self._seed = seed
     
     def reset(self):
-        if self.init_state is not None:
-            if not self.has_reset_before:
-                # the env must be fully reset at least once to ensure correct rendering
-                self.env.reset()
-                self.has_reset_before = True
+        # if self.init_state is not None:
+        #     if not self.has_reset_before:
+        #         # the env must be fully reset at least once to ensure correct rendering
+        #         self.env.reset()
+        #         self.has_reset_before = True
 
-            # always reset to the same state
-            # to be compatible with gym
-            raw_obs = self.env.reset_to({'states': self.init_state})
-        elif self._seed is not None:
-            # reset to a specific seed
-            seed = self._seed
-            if seed in self.seed_state_map:
-                # env.reset is expensive, use cache
-                raw_obs = self.env.reset_to({'states': self.seed_state_map[seed]})
-            else:
-                # robosuite's initializes all use numpy global random state
-                np.random.seed(seed=seed)
-                raw_obs = self.env.reset()
-                state = self.env.get_state()['states']
-                self.seed_state_map[seed] = state
-            self._seed = None
-        else:
-            # random reset
-            raw_obs = self.env.reset()
-
+        #     # always reset to the same state
+        #     # to be compatible with gym
+        #     raw_obs = self.env.reset_to({'states': self.init_state})
+        # elif self._seed is not None:
+        #     # reset to a specific seed
+        #     seed = self._seed
+        #     if seed in self.seed_state_map:
+        #         # env.reset is expensive, use cache
+        #         raw_obs = self.env.reset_to({'states': self.seed_state_map[seed]})
+        #     else:
+        #         # robosuite's initializes all use numpy global random state
+        #         np.random.seed(seed=seed)
+        #         raw_obs = self.env.reset()
+        #         state = self.env.get_state()['states']
+        #         self.seed_state_map[seed] = state
+        #     self._seed = None
+        # else:
+        #     # random reset
+        #     raw_obs = self.env.reset()
+        raw_obs = self.env.reset()
         # return obs
         obs = self.get_observation(raw_obs)
         return obs

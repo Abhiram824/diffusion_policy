@@ -23,15 +23,25 @@ import robomimic.utils.file_utils as FileUtils
 import robomimic.utils.env_utils as EnvUtils
 import robomimic.utils.obs_utils as ObsUtils
 
+import robocasa
+# import mimicgen
+EVAL_UPDATE_KWARGS =  {
+                "generative_textures": None,
+                "randomize_cameras": False,
+                "obj_instance_split": "B",
+            }
+
 
 def create_env(env_meta, shape_meta, enable_render=True):
     modality_mapping = collections.defaultdict(list)
     for key, attr in shape_meta['obs'].items():
         modality_mapping[attr.get('type', 'low_dim')].append(key)
     ObsUtils.initialize_obs_modality_mapping_from_dict(modality_mapping)
-
+    env_name = env_meta['env_name']
+    env_name = env_name[3:] if env_name.startswith('MG_') else env_name
     env = EnvUtils.create_env_from_metadata(
         env_meta=env_meta,
+        env_name=env_name,
         render=False, 
         render_offscreen=enable_render,
         use_image_obs=enable_render, 
@@ -80,6 +90,7 @@ class RobomimicImageRunner(BaseImageRunner):
             dataset_path)
         # disable object state observation
         env_meta['env_kwargs']['use_object_obs'] = False
+        env_meta['env_kwargs'].update(EVAL_UPDATE_KWARGS)
 
         rotation_transformer = None
         if abs_action:
@@ -94,7 +105,7 @@ class RobomimicImageRunner(BaseImageRunner):
             # Robosuite's hard reset causes excessive memory consumption.
             # Disabled to run more envs.
             # https://github.com/ARISE-Initiative/robosuite/blob/92abf5595eddb3a845cd1093703e5a3ccd01e77e/robosuite/environments/base.py#L247-L248
-            robomimic_env.env.hard_reset = False
+            # robomimic_env.env.hard_reset = False
             return MultiStepWrapper(
                 VideoRecordingWrapper(
                     RobomimicImageWrapper(
@@ -160,7 +171,8 @@ class RobomimicImageRunner(BaseImageRunner):
 
         # train
         with h5py.File(dataset_path, 'r') as f:
-            for i in range(n_train):
+            start = 0 if 'data/demo_0' in f else 1
+            for i in range(start, n_train):
                 train_idx = train_start_idx + i
                 enable_render = i < n_train_vis
                 init_state = f[f'data/demo_{train_idx}/states'][0]
@@ -215,8 +227,8 @@ class RobomimicImageRunner(BaseImageRunner):
             env_prefixs.append('test/')
             env_init_fn_dills.append(dill.dumps(init_fn))
 
-        env = AsyncVectorEnv(env_fns, dummy_env_fn=dummy_env_fn)
-        # env = SyncVectorEnv(env_fns)
+        # env = AsyncVectorEnv(env_fns, dummy_env_fn=dummy_env_fn)
+        env = SyncVectorEnv(env_fns)
 
 
         self.env_meta = env_meta
@@ -306,7 +318,15 @@ class RobomimicImageRunner(BaseImageRunner):
                 env_action = action
                 if self.abs_action:
                     env_action = self.undo_transform_action(action)
+                ac_size = list(env_action.shape)
+                ac_size[-1] = 1
+                base_ac = np.array([0, 0, 0, 0, -1])
 
+                # Expand base_ac to shape (1, 8, 5) so it can be concatenated along the last axis
+                base_ac_expanded = np.tile(base_ac, ac_size)
+
+                # Concatenate along the last axis (axis=-1)
+                env_action = np.concatenate([env_action, base_ac_expanded], axis=-1)
                 obs, reward, done, info = env.step(env_action)
                 done = np.all(done)
                 past_action = action
@@ -332,6 +352,8 @@ class RobomimicImageRunner(BaseImageRunner):
         # to completely reproduce reported numbers, uncomment this line:
         # for i in range(len(self.env_fns)):
         # and comment out this line
+        success_rate = sum([np.max(all_rewards[i]) > 0 for i in range(n_inits)]) / n_inits
+        print(f"Success rate: {success_rate}")
         for i in range(n_inits):
             seed = self.env_seeds[i]
             prefix = self.env_prefixs[i]
@@ -344,7 +366,7 @@ class RobomimicImageRunner(BaseImageRunner):
             if video_path is not None:
                 sim_video = wandb.Video(video_path)
                 log_data[prefix+f'sim_video_{seed}'] = sim_video
-        
+        log_data['success_rate'] = success_rate
         # log aggregate metrics
         for prefix, value in max_rewards.items():
             name = prefix+'mean_score'

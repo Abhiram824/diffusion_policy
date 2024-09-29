@@ -221,7 +221,7 @@ class RobomimicReplayImageDataset(BaseImageDataset):
 
 
 def _convert_actions(raw_actions, abs_action, rotation_transformer):
-    actions = raw_actions
+    actions = raw_actions[...,:7]
     if abs_action:
         is_dual_arm = False
         if raw_actions.shape[-1] == 14:
@@ -245,6 +245,8 @@ def _convert_actions(raw_actions, abs_action, rotation_transformer):
 
 def _convert_robomimic_to_replay(store, shape_meta, dataset_path, abs_action, rotation_transformer, 
         n_workers=None, max_inflight_tasks=None):
+    action_key = 'actions_abs' if abs_action else 'actions'
+
     if n_workers is None:
         n_workers = multiprocessing.cpu_count()
     if max_inflight_tasks is None:
@@ -274,7 +276,7 @@ def _convert_robomimic_to_replay(store, shape_meta, dataset_path, abs_action, ro
         prev_end = 0
         for i in range(len(demos)):
             demo = demos[f'demo_{i}']
-            episode_length = demo['actions'].shape[0]
+            episode_length = demo[action_key].shape[0]
             episode_end = prev_end + episode_length
             prev_end = episode_end
             episode_ends.append(episode_end)
@@ -287,7 +289,7 @@ def _convert_robomimic_to_replay(store, shape_meta, dataset_path, abs_action, ro
         for key in tqdm(lowdim_keys + ['action'], desc="Loading lowdim data"):
             data_key = 'obs/' + key
             if key == 'action':
-                data_key = 'actions'
+                data_key = action_key
             this_data = list()
             for i in range(len(demos)):
                 demo = demos[f'demo_{i}']
