@@ -14,6 +14,7 @@ from diffusion_policy.gym_util.sync_vector_env import SyncVectorEnv
 from diffusion_policy.gym_util.multistep_wrapper import MultiStepWrapper
 from diffusion_policy.gym_util.video_recording_wrapper import VideoRecordingWrapper, VideoRecorder
 from diffusion_policy.model.common.rotation_transformer import RotationTransformer
+from omegaconf import OmegaConf
 
 from diffusion_policy.policy.base_image_policy import BaseImagePolicy
 from diffusion_policy.common.pytorch_util import dict_apply
@@ -25,11 +26,11 @@ import robomimic.utils.obs_utils as ObsUtils
 
 import robocasa
 # import mimicgen
-EVAL_UPDATE_KWARGS =  {
-                "generative_textures": None,
-                "randomize_cameras": False,
-                "obj_instance_split": "B",
-            }
+# EVAL_UPDATE_KWARGS =  {
+#                 "generative_textures": None,
+#                 "randomize_cameras": False,
+#                 "obj_instance_split": "B",
+#             }
 
 
 def create_env(env_meta, shape_meta, enable_render=True):
@@ -73,7 +74,8 @@ class RobomimicImageRunner(BaseImageRunner):
             past_action=False,
             abs_action=False,
             tqdm_interval_sec=5.0,
-            n_envs=None
+            n_envs=None,
+            env_kwargs=None
         ):
         super().__init__(output_dir)
 
@@ -90,7 +92,8 @@ class RobomimicImageRunner(BaseImageRunner):
             dataset_path)
         # disable object state observation
         env_meta['env_kwargs']['use_object_obs'] = False
-        env_meta['env_kwargs'].update(EVAL_UPDATE_KWARGS)
+        self.env_kwargs = OmegaConf.to_container(env_kwargs) if env_kwargs is not None else {}
+        env_meta['env_kwargs'].update(self.env_kwargs)
 
         rotation_transformer = None
         if abs_action:
