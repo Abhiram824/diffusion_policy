@@ -16,10 +16,12 @@ shape_meta: &shape_meta
       shape: [4]
     robot0_gripper_qpos:
       shape: [2]
+    lang_emb:
+      shape: [768]
   action: 
     shape: [7]
 
-dataset_path: &dataset_path  /data1/abhim/datasets/small/single_stage/kitchen_pnp/PnPCounterToCab/mg/2024-09-16-07-31-55_rel/demo_im128.hdf5
+dataset_path: &dataset_path  /data1/abhi/datasets/robocasa/small/single_stage/kitchen_pnp/PnPCounterToCab/mg/2024-09-16-07-31-55/demo_im128.hdf5
 abs_action: &abs_action False
 
 env_runner:

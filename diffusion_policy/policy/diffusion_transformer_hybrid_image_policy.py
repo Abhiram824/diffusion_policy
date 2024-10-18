@@ -11,6 +11,7 @@ from diffusion_policy.policy.base_image_policy import BaseImagePolicy
 from diffusion_policy.model.diffusion.transformer_for_diffusion import TransformerForDiffusion
 from diffusion_policy.model.diffusion.mask_generator import LowdimMaskGenerator
 from diffusion_policy.common.robomimic_config_util import get_robomimic_config
+from robomimic.config import config_factory
 from robomimic.algo import algo_factory
 from robomimic.algo.algo import PolicyAlgo
 import robomimic.utils.obs_utils as ObsUtils
@@ -94,7 +95,12 @@ class DiffusionTransformerHybridImagePolicy(BaseImagePolicy):
                     if modality.obs_randomizer_class == 'CropRandomizer':
                         modality.obs_randomizer_kwargs.crop_height = ch
                         modality.obs_randomizer_kwargs.crop_width = cw
-
+            
+            if "lang_emb" in obs_config['low_dim']:
+                config.observation.encoder.rgb.core_class = "VisualCoreLanguageConditioned"
+                config.observation.encoder.rgb.core_kwargs.backbone_class = "ResNet18ConvFiLM"
+        # TODO update config to match film config
+        print(config)
         # init global state
         ObsUtils.initialize_obs_utils_with_config(config)
 
@@ -313,7 +319,7 @@ class DiffusionTransformerHybridImagePolicy(BaseImagePolicy):
         return optimizer
 
     def compute_loss(self, batch):
-        # normalize input
+        # normalize input. Note proprioceptive data and language embeddings are not normalized in robomimic but are here
         assert 'valid_mask' not in batch
         nobs = self.normalizer.normalize(batch['obs'])
         nactions = self.normalizer['action'].normalize(batch['action'])

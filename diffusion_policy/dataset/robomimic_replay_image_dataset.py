@@ -29,6 +29,8 @@ from diffusion_policy.common.normalize_util import (
     get_identity_normalizer_from_stat,
     array_to_stats
 )
+from robomimic.utils.lang_utils import LangEncoder
+import robomimic.utils.tensor_utils as TensorUtils
 register_codecs()
 
 class RobomimicReplayImageDataset(BaseImageDataset):
@@ -175,6 +177,9 @@ class RobomimicReplayImageDataset(BaseImageDataset):
                 this_normalizer = get_identity_normalizer_from_stat(stat)
             elif key.endswith('qpos'):
                 this_normalizer = get_range_normalizer_from_stat(stat)
+            elif key == 'lang_emb':
+                # lang_emb embeddings shouldnt need normalization!
+                this_normalizer = get_identity_normalizer_from_stat(stat)
             else:
                 raise RuntimeError('unsupported')
             normalizer[key] = this_normalizer
@@ -242,6 +247,9 @@ def _convert_actions(raw_actions, abs_action, rotation_transformer):
         actions = raw_actions
     return actions
 
+def _convert_lang_emb(lang, lang_encoder):
+    lang_emb = lang_encoder.get_lang_emb(lang)
+    return TensorUtils.to_numpy(lang_emb)
 
 def _convert_robomimic_to_replay(store, shape_meta, dataset_path, abs_action, rotation_transformer, 
         n_workers=None, max_inflight_tasks=None):
@@ -274,7 +282,7 @@ def _convert_robomimic_to_replay(store, shape_meta, dataset_path, abs_action, ro
         demos = file['data']
         episode_ends = list()
         prev_end = 0
-        for i in range(len(demos)):
+        for i in range(10):
             demo = demos[f'demo_{i}']
             episode_length = demo[action_key].shape[0]
             episode_end = prev_end + episode_length
@@ -291,10 +299,16 @@ def _convert_robomimic_to_replay(store, shape_meta, dataset_path, abs_action, ro
             if key == 'action':
                 data_key = action_key
             this_data = list()
-            for i in range(len(demos)):
+            for i in range(10):
                 demo = demos[f'demo_{i}']
-                this_data.append(demo[data_key][:].astype(np.float32))
-            this_data = np.concatenate(this_data, axis=0)
+                if key == "lang_emb":
+                    traj_len = demo["actions"].shape[0]
+                    ep_meta = json.loads(demo.attrs["ep_meta"])
+                    this_data.extend([ep_meta["lang"] for _ in range(traj_len)])
+                else:
+                    this_data.append(demo[data_key][:].astype(np.float32))
+            if key != "lang_emb":
+                this_data = np.concatenate(this_data, axis=0)
             if key == 'action':
                 this_data = _convert_actions(
                     raw_actions=this_data,
@@ -302,6 +316,12 @@ def _convert_robomimic_to_replay(store, shape_meta, dataset_path, abs_action, ro
                     rotation_transformer=rotation_transformer
                 )
                 assert this_data.shape == (n_steps,) + tuple(shape_meta['action']['shape'])
+            elif key == "lang_emb":
+                print("Converting lang_emb to embeddings")
+                lang_encoder = LangEncoder(device="cuda:0")
+                this_data = _convert_lang_emb(this_data, lang_encoder=lang_encoder)
+                print("min and max val of embeddings", np.min(this_data), np.max(this_data))
+                assert this_data.shape == (n_steps,) + tuple(shape_meta['obs'][key]['shape'])
             else:
                 assert this_data.shape == (n_steps,) + tuple(shape_meta['obs'][key]['shape'])
             _ = data_group.array(
@@ -338,7 +358,7 @@ def _convert_robomimic_to_replay(store, shape_meta, dataset_path, abs_action, ro
                         compressor=this_compressor,
                         dtype=np.uint8
                     )
-                    for episode_idx in range(len(demos)):
+                    for episode_idx in range(10):
                         demo = demos[f'demo_{episode_idx}']
                         hdf5_arr = demo['obs'][key]
                         for hdf5_idx in range(hdf5_arr.shape[0]):

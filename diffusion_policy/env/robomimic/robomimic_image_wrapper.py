@@ -46,6 +46,8 @@ class RobomimicImageWrapper(gym.Env):
             elif key.endswith('pos'):
                 # better range?
                 min_value, max_value = -1, 1
+            elif key == "lang_emb":
+                min_value, max_value = -100, 100
             else:
                 raise RuntimeError(f"Unsupported type {key}")
             
