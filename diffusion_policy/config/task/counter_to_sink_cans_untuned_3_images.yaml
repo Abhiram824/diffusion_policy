@@ -1,4 +1,4 @@
-name: counter_to_sink_can_real_untuned_image
+name: counter_to_sink_can_real_untuned_3_images
 
 shape_meta: &shape_meta
   # acceptable types: rgb, low_dim
@@ -7,6 +7,9 @@ shape_meta: &shape_meta
       shape: [3, 128, 128]
       type: rgb
     robot0_eye_in_hand_image:
+      shape: [3, 128, 128]
+      type: rgb
+    robot0_agentview_right_image:
       shape: [3, 128, 128]
       type: rgb
     robot0_eef_pos:
@@ -19,7 +22,7 @@ shape_meta: &shape_meta
   action: 
     shape: [7]
 
-dataset_path: &dataset_path /home/abhim/robocasa/demos_large1.5/demo.hdf5
+dataset_path: &dataset_path /home/abhim/robocasa/demos_large2/demo.hdf5
 abs_action: &abs_action False
 
 env_runner:
